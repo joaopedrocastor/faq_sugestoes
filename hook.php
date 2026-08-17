@@ -4,14 +4,16 @@
  * Config context used to store this plugin's settings in glpi_configs.
  * Guarded so front-end pages can include this file without redefining it.
  */
-if (!defined('PLUGIN_KBHINT_CONFIG_CONTEXT')) {
-    define('PLUGIN_KBHINT_CONFIG_CONTEXT', 'plugin:kbhint');
+if (!defined('PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT')) {
+    define('PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT', 'plugin:faq_sugestoes');
 }
 
 /**
  * Default settings, also used as fallback by the JS when a value is missing.
+ * display_mode: 'inline' (fixed list under the field), 'floating' (overlay box)
+ *               or 'both'.
  */
-function plugin_kbhint_getDefaultConfig(): array
+function plugin_faq_sugestoes_getDefaultConfig(): array
 {
     return [
         'enabled'       => 1,
@@ -19,7 +21,8 @@ function plugin_kbhint_getDefaultConfig(): array
         'min_query_len' => 3,
         'debounce_ms'   => 300,
         'match_mode'    => 'recall',
-        'panel_title'   => 'Artigos relacionados na Base de Conhecimento',
+        'display_mode'  => 'inline',
+        'panel_title'   => 'Artigos sugeridos',
     ];
 }
 
@@ -27,13 +30,13 @@ function plugin_kbhint_getDefaultConfig(): array
  * On install, seed any missing config value with its default (keeps existing
  * values on re-install / upgrade).
  */
-function plugin_kbhint_install(): bool
+function plugin_faq_sugestoes_install(): bool
 {
-    $defaults = plugin_kbhint_getDefaultConfig();
-    $current  = Config::getConfigurationValues(PLUGIN_KBHINT_CONFIG_CONTEXT);
+    $defaults = plugin_faq_sugestoes_getDefaultConfig();
+    $current  = Config::getConfigurationValues(PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT);
     $missing  = array_diff_key($defaults, $current);
     if (!empty($missing)) {
-        Config::setConfigurationValues(PLUGIN_KBHINT_CONFIG_CONTEXT, $missing);
+        Config::setConfigurationValues(PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT, $missing);
     }
     return true;
 }
@@ -41,11 +44,11 @@ function plugin_kbhint_install(): bool
 /**
  * On uninstall, drop this plugin's config context entirely.
  */
-function plugin_kbhint_uninstall(): bool
+function plugin_faq_sugestoes_uninstall(): bool
 {
     Config::deleteConfigurationValues(
-        PLUGIN_KBHINT_CONFIG_CONTEXT,
-        array_keys(plugin_kbhint_getDefaultConfig())
+        PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT,
+        array_keys(plugin_faq_sugestoes_getDefaultConfig())
     );
     return true;
 }

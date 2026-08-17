@@ -1,4 +1,5 @@
-.kbhint-panel {
+/* ---- Floating overlay box (display_mode: floating / both) ---- */
+.faqsug-panel {
     position: absolute;
     z-index: 1080;
     margin: 2px 0 0 0;
@@ -12,11 +13,11 @@
     font-size: 0.92rem;
 }
 
-.kbhint-panel[hidden] {
+.faqsug-panel[hidden] {
     display: none;
 }
 
-.kbhint-header {
+.faqsug-header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -30,12 +31,12 @@
     border-bottom: 1px solid var(--tblr-warning, #ffecb5);
 }
 
-.kbhint-header-title {
+.faqsug-header-title {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.kbhint-close {
+.faqsug-close {
     flex: 0 0 auto;
     width: 22px;
     height: 22px;
@@ -50,25 +51,25 @@
     opacity: 0.6;
 }
 
-.kbhint-close:hover,
-.kbhint-close:focus {
+.faqsug-close:hover,
+.faqsug-close:focus {
     opacity: 1;
     background: color-mix(in srgb, currentColor 12%, transparent);
     outline: none;
 }
 
-.kbhint-list {
+.faqsug-list {
     margin: 0;
     padding: 4px 0;
     list-style: none;
 }
 
-.kbhint-item {
+.faqsug-list .faqsug-item {
     padding: 0;
     margin: 0;
 }
 
-.kbhint-item > a {
+.faqsug-list .faqsug-item > a {
     display: block;
     padding: 6px 12px;
     color: inherit;
@@ -78,13 +79,13 @@
     text-overflow: ellipsis;
 }
 
-.kbhint-item:hover > a,
-.kbhint-item[aria-selected="true"] > a {
+.faqsug-list .faqsug-item:hover > a,
+.faqsug-list .faqsug-item[aria-selected="true"] > a {
     background-color: var(--tblr-primary-lt, #eef4ff);
     text-decoration: none;
 }
 
-.kbhint-live {
+.faqsug-live {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -93,4 +94,40 @@
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     border: 0;
+}
+
+/* ---- Fixed inline list under the field (display_mode: inline / both) ---- */
+.faqsug-inline {
+    margin: 8px 0 10px 0;
+}
+
+.faqsug-inline[hidden] {
+    display: none;
+}
+
+.faqsug-inline-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--tblr-body-color, #1f2937);
+}
+
+.faqsug-inline-list {
+    margin: 0;
+    padding-left: 1.3em;
+    list-style: disc;
+}
+
+.faqsug-inline-list .faqsug-item {
+    display: list-item;
+    margin: 2px 0;
+}
+
+.faqsug-inline-list .faqsug-item > a {
+    color: var(--tblr-primary, #206bc4);
+    text-decoration: underline;
+    white-space: normal;
+}
+
+.faqsug-inline-list .faqsug-item[aria-selected="true"] > a {
+    background-color: var(--tblr-primary-lt, #eef4ff);
 }

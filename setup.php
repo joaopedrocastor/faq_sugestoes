@@ -1,45 +1,45 @@
 <?php
 
-define('PLUGIN_KBHINT_VERSION', '1.0.0');
-define('PLUGIN_KBHINT_MIN_GLPI', '10.0.0');
-define('PLUGIN_KBHINT_MAX_GLPI', '10.0.99');
+define('PLUGIN_FAQ_SUGESTOES_VERSION', '1.1.0');
+define('PLUGIN_FAQ_SUGESTOES_MIN_GLPI', '10.0.0');
+define('PLUGIN_FAQ_SUGESTOES_MAX_GLPI', '10.0.99');
 
 /**
  * Init the plugin: register the hooks that inject the CSS/JS on GLPI pages.
  */
-function plugin_init_kbhint(): void
+function plugin_init_faq_sugestoes(): void
 {
     global $PLUGIN_HOOKS;
 
-    // Required so the plugin's ajax endpoint is reachable without a CSRF token error.
-    $PLUGIN_HOOKS['csrf_compliant']['kbhint'] = true;
+    // Required so the plugin's ajax endpoints are reachable without a CSRF error.
+    $PLUGIN_HOOKS['csrf_compliant']['faq_sugestoes'] = true;
 
     // Injected on all authenticated pages (central + simplified helpdesk).
-    // kbhint.js bails out silently on anything that is not a ticket-creation form.
-    $PLUGIN_HOOKS['add_javascript']['kbhint'] = 'js/kbhint.js';
-    $PLUGIN_HOOKS['add_css']['kbhint']        = 'css/kbhint.css';
+    // The JS bails out silently on anything that is not a ticket-creation form.
+    $PLUGIN_HOOKS['add_javascript']['faq_sugestoes'] = 'js/faqsugestoes.js';
+    $PLUGIN_HOOKS['add_css']['faq_sugestoes']        = 'css/faqsugestoes.css';
 
     // Adds the "gear" config link on the plugins list (Setup > Plugins).
     if (Session::haveRight('config', UPDATE)) {
-        $PLUGIN_HOOKS['config_page']['kbhint'] = 'front/config.form.php';
+        $PLUGIN_HOOKS['config_page']['faq_sugestoes'] = 'front/config.form.php';
     }
 }
 
 /**
  * Plugin metadata shown in the plugins list.
  */
-function plugin_version_kbhint(): array
+function plugin_version_faq_sugestoes(): array
 {
     return [
         'name'         => 'Sugestões da Base de Conhecimento',
-        'version'      => PLUGIN_KBHINT_VERSION,
+        'version'      => PLUGIN_FAQ_SUGESTOES_VERSION,
         'author'       => 'João Pedro Castor Quirino',
         'license'      => 'GPLv3+',
-        'homepage'     => 'https://github.com/tdido/glpi-kb-hint-plugin',
+        'homepage'     => 'https://github.com/joaopedrocastor/faq_sugestoes',
         'requirements' => [
             'glpi' => [
-                'min' => PLUGIN_KBHINT_MIN_GLPI,
-                'max' => PLUGIN_KBHINT_MAX_GLPI,
+                'min' => PLUGIN_FAQ_SUGESTOES_MIN_GLPI,
+                'max' => PLUGIN_FAQ_SUGESTOES_MAX_GLPI,
             ],
         ],
     ];
@@ -48,15 +48,15 @@ function plugin_version_kbhint(): array
 /**
  * Nothing to check before install.
  */
-function plugin_kbhint_check_prerequisites(): bool
+function plugin_faq_sugestoes_check_prerequisites(): bool
 {
     return true;
 }
 
 /**
- * Nothing to configure.
+ * Nothing to configure at prerequisite time.
  */
-function plugin_kbhint_check_config($verbose = false): bool
+function plugin_faq_sugestoes_check_config($verbose = false): bool
 {
     return true;
 }

@@ -1,37 +1,38 @@
 /* global tinymce, CFG_GLPI */
 /**
- * KB Hint (GLPI 10) — inline Knowledge Base suggestions while opening a ticket.
+ * Sugestões da Base de Conhecimento (GLPI 10) — sugere artigos da KB enquanto o
+ * usuário digita no formulário clássico de abertura de chamado.
  *
- * Adapted from tdido/glpi-kb-hint-plugin (GLPI 11). The GLPI 11 version targets
- * the new end-user Form renderer (/Form/Render/<id>, fields named answers_*).
- * GLPI 10 uses the classic ticket form instead, so this build:
- *   - triggers on ticket.form.php (central) and helpdesk.public.php (self-service);
- *   - reads the title from input[name="name"] and the description from
- *     textarea[name="content"] (a TinyMCE editor).
- * Everything below the field discovery is unchanged in spirit from the original.
+ * Adaptado de tdido/glpi-kb-hint-plugin (GLPI 11). Aqui o alvo é o formulário
+ * clássico do GLPI 10: título em input[name="name"] e descrição em
+ * textarea[name="content"] (editor TinyMCE), na interface padrão
+ * (ticket.form.php) e no autoatendimento (helpdesk.public.php?create_ticket=1).
+ *
+ * A exibição tem 3 modos, escolhidos na tela de config (display_mode):
+ *   - 'inline'   : lista fixa logo abaixo do campo (padrão);
+ *   - 'floating' : caixa flutuante ancorada no campo;
+ *   - 'both'     : as duas ao mesmo tempo.
  */
 (function () {
     'use strict';
 
-    const DEBUG_PREFIX = '[kbhint]';
+    const DEBUG_PREFIX = '[faq_sugestoes]';
     const MAX_TOKENS = 8;
-    // Runtime settings, loaded from ajax/config.php (the plugin config screen).
-    // These defaults are used until that request resolves, and as a fallback if
-    // it fails. Keep them in sync with plugin_kbhint_getDefaultConfig() in hook.php.
-    // matchMode: 'recall'    = OR across title + description tokens (wider net).
-    //            'precision' = title tokens required, description only boosts score.
+
+    // Runtime settings, carregadas de ajax/config.php (a tela de configuração).
+    // Estes padrões valem até a requisição resolver e como fallback se ela falhar.
+    // Mantenha em sincronia com plugin_faq_sugestoes_getDefaultConfig() no hook.php.
     const CFG = {
         enabled: true,
         minQueryLen: 3,
         debounceMs: 300,
         maxResults: 5,
-        matchMode: 'recall',
-        panelTitle: 'Artigos relacionados na Base de Conhecimento',
+        matchMode: 'recall',          // 'recall' (mais amplo) | 'precision' (título obrigatório)
+        displayMode: 'inline',        // 'inline' | 'floating' | 'both'
+        panelTitle: 'Artigos sugeridos',
     };
-    // Common short words that, once turned into prefix-wildcard tokens (for*, the*, para*),
-    // would match too broadly: MySQL FT does not apply its stopword filter to wildcard
-    // prefixes. Mirrors InnoDB's built-in English stopword list plus common Portuguese and
-    // Spanish articles, prepositions, conjunctions and pronouns. Entries must be lowercase.
+
+    // Palavras curtas ignoradas ao montar os termos de busca (PT/EN/ES).
     const STOPWORDS = new Set([
         // English (InnoDB default)
         'a', 'about', 'an', 'are', 'as', 'at', 'be', 'by', 'com', 'de', 'en', 'for', 'from',
@@ -53,6 +54,7 @@
     }
 
     const root = readRootDoc();
+    const PLUGIN_BASE = pluginBase();
 
     // Load settings first, then wire up the form (unless disabled in config).
     loadConfig().then(() => {
@@ -67,8 +69,7 @@
     });
 
     function loadConfig() {
-        const url = root + '/plugins/kbhint/ajax/config.php';
-        return fetch(url, {
+        return fetch(PLUGIN_BASE + '/ajax/config.php', {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' },
         }).then((res) => (res.ok ? res.json() : null)).then((cfg) => {
@@ -90,11 +91,14 @@
             if (cfg.match_mode) {
                 CFG.matchMode = cfg.match_mode;
             }
+            if (cfg.display_mode) {
+                CFG.displayMode = cfg.display_mode;
+            }
             if (typeof cfg.panel_title === 'string' && cfg.panel_title) {
                 CFG.panelTitle = cfg.panel_title;
             }
         }).catch(() => {
-            // Network/endpoint error: keep the built-in defaults above.
+            // Erro de rede/endpoint: mantém os padrões acima.
         });
     }
 
@@ -102,7 +106,7 @@
         if (waitForForm(attachToForm)) {
             return;
         }
-        // The ticket form is often rendered asynchronously; watch for it to appear.
+        // O formulário costuma ser renderizado de forma assíncrona; observe-o surgir.
         const observer = new MutationObserver(() => {
             if (waitForForm(attachToForm)) {
                 observer.disconnect();
@@ -126,7 +130,7 @@
         const descriptionField = textarea ? wrapDescription(textarea) : null;
 
         if (!titleInput && !descriptionField) {
-            console.warn(DEBUG_PREFIX, 'No title or description field discovered on this form.');
+            console.warn(DEBUG_PREFIX, 'Nenhum campo de título ou descrição encontrado neste formulário.');
             return;
         }
 
@@ -136,32 +140,181 @@
             anchorEl: titleInput || (descriptionField && descriptionField.anchor),
             controller: null,
             debounceHandle: null,
-            dropdown: null,
+            views: [],
             items: [],
             selectedIndex: -1,
             lastExpression: '',
             dismissedExpression: null,
         };
 
-        state.dropdown = createDropdown();
-        document.body.appendChild(state.dropdown.root);
+        const wantFloating = CFG.displayMode === 'floating' || CFG.displayMode === 'both';
+        const wantInline = CFG.displayMode === 'inline' || CFG.displayMode === 'both';
 
-        state.dropdown.closeBtn.addEventListener('click', () => dismiss(state));
+        if (wantFloating) {
+            const fv = createFloatingView(state);
+            document.body.appendChild(fv.root);
+            state.views.push(fv);
+        }
+        if (wantInline) {
+            const iv = createInlineView(state);
+            if (iv) {
+                state.views.push(iv);
+            }
+        }
 
         bindInput(state);
         bindOutsideClick(state);
         bindReposition(state);
     }
 
-    function dismiss(state) {
-        state.dismissedExpression = state.lastExpression || '';
-        if (state.controller) {
-            state.controller.abort();
-            state.controller = null;
-        }
-        state.dropdown.panel.hidden = true;
-        state.dropdown.live.textContent = '';
+    // ---- Views -------------------------------------------------------------
+
+    function articleUrl(item) {
+        return root + '/front/knowbaseitem.form.php?id=' + encodeURIComponent(item.id);
     }
+
+    function buildLink(item) {
+        const a = document.createElement('a');
+        a.href = articleUrl(item);
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = stripTags(String(item.name));
+        return a;
+    }
+
+    // Floating overlay box anchored below the active field.
+    function createFloatingView(state) {
+        const panel = document.createElement('div');
+        panel.className = 'faqsug-panel';
+        panel.hidden = true;
+
+        const header = document.createElement('div');
+        header.className = 'faqsug-header';
+
+        const headerTitle = document.createElement('span');
+        headerTitle.className = 'faqsug-header-title';
+        headerTitle.textContent = CFG.panelTitle;
+        header.appendChild(headerTitle);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'faqsug-close';
+        closeBtn.setAttribute('aria-label', 'Fechar sugestões');
+        closeBtn.title = 'Fechar';
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => dismiss(state));
+        header.appendChild(closeBtn);
+
+        panel.appendChild(header);
+
+        const ul = document.createElement('ul');
+        ul.className = 'faqsug-list';
+        ul.setAttribute('role', 'listbox');
+        ul.setAttribute('aria-label', 'Sugestões da base de conhecimento');
+        panel.appendChild(ul);
+
+        const live = document.createElement('span');
+        live.className = 'faqsug-live';
+        live.setAttribute('aria-live', 'polite');
+
+        const rootEl = document.createElement('div');
+        rootEl.className = 'faqsug-root';
+        rootEl.appendChild(panel);
+        rootEl.appendChild(live);
+
+        return {
+            type: 'floating',
+            root: rootEl,
+            list: ul,
+            setResults(items) {
+                ul.textContent = '';
+                for (const item of items) {
+                    const li = document.createElement('li');
+                    li.className = 'faqsug-item';
+                    li.setAttribute('role', 'option');
+                    li.appendChild(buildLink(item));
+                    ul.appendChild(li);
+                }
+            },
+            show() {
+                panel.hidden = false;
+                positionFloating(state, panel);
+                live.textContent = state.items.length + (state.items.length === 1 ? ' sugestão' : ' sugestões');
+            },
+            hide() {
+                panel.hidden = true;
+                live.textContent = '';
+            },
+            isHidden() {
+                return panel.hidden;
+            },
+            reposition() {
+                if (!panel.hidden) {
+                    positionFloating(state, panel);
+                }
+            },
+        };
+    }
+
+    // Fixed list inserted right below the title field (matches the reference print).
+    function createInlineView(state) {
+        const host = inlineHost(state);
+        if (!host || !host.parentNode) {
+            return null;
+        }
+
+        const box = document.createElement('div');
+        box.className = 'faqsug-inline';
+        box.hidden = true;
+
+        const title = document.createElement('div');
+        title.className = 'faqsug-inline-title';
+        title.textContent = CFG.panelTitle;
+        box.appendChild(title);
+
+        const ul = document.createElement('ul');
+        ul.className = 'faqsug-inline-list';
+        box.appendChild(ul);
+
+        host.parentNode.insertBefore(box, host.nextSibling);
+
+        return {
+            type: 'inline',
+            root: box,
+            list: ul,
+            setResults(items) {
+                ul.textContent = '';
+                for (const item of items) {
+                    const li = document.createElement('li');
+                    li.className = 'faqsug-item';
+                    li.appendChild(buildLink(item));
+                    ul.appendChild(li);
+                }
+            },
+            show() {
+                box.hidden = false;
+            },
+            hide() {
+                box.hidden = true;
+            },
+            isHidden() {
+                return box.hidden;
+            },
+            reposition() {},
+        };
+    }
+
+    // Best-effort container to hang the inline list after: the field's wrapper,
+    // falling back to the input's parent.
+    function inlineHost(state) {
+        const el = state.titleInput || (state.descriptionField && state.descriptionField.anchor);
+        if (!el) {
+            return null;
+        }
+        return el.closest('.form-field, .form-group, [class*="col-"]') || el.parentElement || el;
+    }
+
+    // ---- Input wiring ------------------------------------------------------
 
     function wrapDescription(textarea) {
         const id = textarea.id;
@@ -337,18 +490,18 @@
         const params = new URLSearchParams();
         params.set('q', value);
 
-        const url = root + '/plugins/kbhint/ajax/search.php?' + params.toString();
+        const url = PLUGIN_BASE + '/ajax/search.php?' + params.toString();
         return fetch(url, {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' },
             signal: state.controller.signal,
         }).then((res) => {
             if (res.status === 403) {
-                console.warn(DEBUG_PREFIX, 'KB search returned 403; ACL may have filtered results.');
+                console.warn(DEBUG_PREFIX, 'Busca retornou 403; ACL pode ter filtrado os resultados.');
                 return [];
             }
             if (!res.ok) {
-                console.warn(DEBUG_PREFIX, 'KB search failed:', res.status);
+                console.warn(DEBUG_PREFIX, 'Busca falhou:', res.status);
                 return [];
             }
             return res.json();
@@ -361,98 +514,33 @@
             if (err && err.name === 'AbortError') {
                 return null;
             }
-            console.warn(DEBUG_PREFIX, 'KB search error:', err);
+            console.warn(DEBUG_PREFIX, 'Erro na busca:', err);
             return [];
         });
     }
 
-    function createDropdown() {
-        const panel = document.createElement('div');
-        panel.className = 'kbhint-panel';
-        panel.hidden = true;
-
-        const header = document.createElement('div');
-        header.className = 'kbhint-header';
-
-        const headerTitle = document.createElement('span');
-        headerTitle.className = 'kbhint-header-title';
-        headerTitle.textContent = CFG.panelTitle;
-        header.appendChild(headerTitle);
-
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'kbhint-close';
-        closeBtn.setAttribute('aria-label', 'Fechar sugestões');
-        closeBtn.title = 'Fechar';
-        closeBtn.textContent = '×';
-        header.appendChild(closeBtn);
-
-        panel.appendChild(header);
-
-        const ul = document.createElement('ul');
-        ul.className = 'kbhint-list';
-        ul.setAttribute('role', 'listbox');
-        ul.setAttribute('aria-label', 'Sugestões da base de conhecimento');
-        panel.appendChild(ul);
-
-        const live = document.createElement('span');
-        live.className = 'kbhint-live';
-        live.setAttribute('aria-live', 'polite');
-
-        const rootEl = document.createElement('div');
-        rootEl.className = 'kbhint-root';
-        rootEl.appendChild(panel);
-        rootEl.appendChild(live);
-
-        return { root: rootEl, panel, list: ul, live, closeBtn };
-    }
+    // ---- Rendering / selection --------------------------------------------
 
     function render(state, results) {
-        const list = state.dropdown.list;
-        list.textContent = '';
         state.items = results.slice(0, CFG.maxResults);
         state.selectedIndex = -1;
 
-        if (state.items.length === 0) {
-            state.dropdown.panel.hidden = true;
-            state.dropdown.live.textContent = '';
-            return;
+        for (const view of state.views) {
+            if (state.items.length === 0) {
+                view.hide();
+            } else {
+                view.setResults(state.items);
+                view.show();
+            }
         }
-
-        for (const item of state.items) {
-            const li = document.createElement('li');
-            li.className = 'kbhint-item';
-            li.setAttribute('role', 'option');
-
-            const a = document.createElement('a');
-            a.href = root + '/front/knowbaseitem.form.php?id=' + encodeURIComponent(item.id);
-            a.target = '_blank';
-            a.rel = 'noopener';
-            a.textContent = stripTags(String(item.name));
-
-            li.appendChild(a);
-            list.appendChild(li);
-        }
-
-        state.dropdown.panel.hidden = false;
-        positionDropdown(state);
-        state.dropdown.live.textContent = state.items.length + (state.items.length === 1 ? ' sugestão' : ' sugestões');
     }
 
-    function positionDropdown(state) {
-        if (!state.anchorEl || state.dropdown.panel.hidden) {
-            return;
-        }
-        const rect = state.anchorEl.getBoundingClientRect();
-        const top = rect.bottom + window.scrollY;
-        const left = rect.left + window.scrollX;
-        state.dropdown.panel.style.top = top + 'px';
-        state.dropdown.panel.style.left = left + 'px';
-        state.dropdown.panel.style.minWidth = rect.width + 'px';
+    function anyViewVisible(state) {
+        return state.views.some((v) => !v.isHidden());
     }
 
     function onKeydown(state, event) {
-        if (state.dropdown.panel.hidden || state.items.length === 0) {
+        if (!anyViewVisible(state) || state.items.length === 0) {
             return;
         }
         if (event.key === 'ArrowDown') {
@@ -463,9 +551,9 @@
             moveSelection(state, -1);
         } else if (event.key === 'Enter' && state.selectedIndex >= 0) {
             event.preventDefault();
-            const a = state.dropdown.list.children[state.selectedIndex].querySelector('a');
-            if (a) {
-                window.open(a.href, a.target || '_blank', 'noopener');
+            const item = state.items[state.selectedIndex];
+            if (item) {
+                window.open(articleUrl(item), '_blank', 'noopener');
             }
         } else if (event.key === 'Escape') {
             dismiss(state);
@@ -474,18 +562,49 @@
 
     function moveSelection(state, delta) {
         const next = (state.selectedIndex + delta + state.items.length) % state.items.length;
-        for (const li of state.dropdown.list.children) {
-            li.removeAttribute('aria-selected');
+        for (const view of state.views) {
+            const children = view.list.children;
+            for (let i = 0; i < children.length; i++) {
+                if (i === next) {
+                    children[i].setAttribute('aria-selected', 'true');
+                } else {
+                    children[i].removeAttribute('aria-selected');
+                }
+            }
         }
-        const target = state.dropdown.list.children[next];
-        target.setAttribute('aria-selected', 'true');
         state.selectedIndex = next;
     }
 
+    function dismiss(state) {
+        state.dismissedExpression = state.lastExpression || '';
+        if (state.controller) {
+            state.controller.abort();
+            state.controller = null;
+        }
+        for (const view of state.views) {
+            view.hide();
+        }
+    }
+
+    // Hide only floating views when the user clicks elsewhere (inline views are
+    // part of the form flow and stay put).
+    function hideFloating(state) {
+        for (const view of state.views) {
+            if (view.type === 'floating') {
+                view.hide();
+            }
+        }
+    }
+
     function bindOutsideClick(state) {
+        const hasFloating = state.views.some((v) => v.type === 'floating');
+        if (!hasFloating) {
+            return;
+        }
+
         document.addEventListener('pointerdown', (event) => {
             const target = event.target;
-            if (target.closest && target.closest('.kbhint-panel')) {
+            if (target.closest && target.closest('.faqsug-panel')) {
                 return;
             }
             if (state.titleInput && state.titleInput.contains && state.titleInput.contains(target)) {
@@ -494,14 +613,14 @@
             if (state.descriptionField && state.descriptionField.anchor && state.descriptionField.anchor.contains && state.descriptionField.anchor.contains(target)) {
                 return;
             }
-            state.dropdown.panel.hidden = true;
+            hideFloating(state);
         });
 
         if (state.descriptionField && typeof state.descriptionField.whenEditorReady === 'function') {
             state.descriptionField.whenEditorReady((editor) => {
                 const dismissIfNotForUs = () => {
                     if (state.anchorEl !== state.descriptionField.anchor) {
-                        state.dropdown.panel.hidden = true;
+                        hideFloating(state);
                     }
                 };
                 if (typeof editor.on === 'function') {
@@ -516,19 +635,35 @@
         }
     }
 
+    function positionFloating(state, panel) {
+        if (!state.anchorEl || panel.hidden) {
+            return;
+        }
+        const rect = state.anchorEl.getBoundingClientRect();
+        panel.style.top = (rect.bottom + window.scrollY) + 'px';
+        panel.style.left = (rect.left + window.scrollX) + 'px';
+        panel.style.minWidth = rect.width + 'px';
+    }
+
     function bindReposition(state) {
-        const reposition = () => positionDropdown(state);
+        const reposition = () => {
+            for (const view of state.views) {
+                view.reposition();
+            }
+        };
         window.addEventListener('scroll', reposition, true);
         window.addEventListener('resize', reposition);
     }
 
+    // ---- Page / environment helpers ---------------------------------------
+
     /**
-     * True only on the "Criar um chamado" (ticket-creation) pages in GLPI 10:
-     *   - central / technician interface: front/ticket.form.php
-     *   - simplified self-service interface: front/helpdesk.public.php?create_ticket=1
-     * The self-service home is also helpdesk.public.php, so we require the
-     * create_ticket flag there to avoid running on the dashboard or ticket list.
-     * The field-discovery step below still guards against false positives.
+     * True apenas nas páginas de "Criar um chamado" do GLPI 10:
+     *   - interface padrão/técnico: front/ticket.form.php
+     *   - autoatendimento: front/helpdesk.public.php?create_ticket=1
+     * A home do autoatendimento também é helpdesk.public.php, por isso exigimos
+     * o parâmetro create_ticket lá. A descoberta de campos ainda protege contra
+     * falsos positivos.
      */
     function isTicketCreatePage() {
         const path = window.location.pathname;
@@ -539,6 +674,20 @@
             return /(^|[?&])create_ticket(=|&|$)/.test(window.location.search);
         }
         return false;
+    }
+
+    // Base web path do próprio plugin (…/plugins/<pasta>), derivada do <script>
+    // que carregou este arquivo — assim funciona mesmo se a pasta for renomeada.
+    function pluginBase() {
+        try {
+            const src = document.currentScript && document.currentScript.src;
+            if (src) {
+                return src.replace(/\/js\/[^/]*$/, '');
+            }
+        } catch (e) {
+            // ignore
+        }
+        return root + '/plugins/faq_sugestoes';
     }
 
     function readRootDoc() {

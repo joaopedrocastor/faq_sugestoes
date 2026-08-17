@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root>
     <name>Sugestões da Base de Conhecimento</name>
-    <key>kbhint</key>
+    <key>faq_sugestoes</key>
     <state>unstable</state>
     <logo></logo>
     <description>
@@ -10,18 +10,19 @@
             <pt_BR>Sugestões da base de conhecimento em linha ao abrir chamado (GLPI 10).</pt_BR>
         </short>
         <long>
-            <en>Suggests existing Knowledge Base articles inline as the user types in the classic GLPI 10 ticket-creation form (central and simplified helpdesk). Title and description drive a full-text query; clicking a suggestion opens the article in a new tab.</en>
-            <pt_BR>Sugere artigos da Base de Conhecimento em linha enquanto o usuário digita no formulário clássico de abertura de chamado do GLPI 10 (interface padrão e autoatendimento). Título e descrição alimentam uma busca full-text; clicar numa sugestão abre o artigo em nova aba.</pt_BR>
+            <en>Suggests existing Knowledge Base articles inline as the user types in the classic GLPI 10 ticket-creation form (central and simplified helpdesk). Display mode is configurable: fixed list under the field, floating box, or both. Clicking a suggestion opens the article in a new tab.</en>
+            <pt_BR>Sugere artigos da Base de Conhecimento em linha enquanto o usuário digita no formulário clássico de abertura de chamado do GLPI 10 (interface padrão e autoatendimento). O modo de exibição é configurável: lista fixa abaixo do campo, caixa flutuante ou ambas. Clicar numa sugestão abre o artigo em nova aba.</pt_BR>
         </long>
     </description>
-    <homepage>https://github.com/tdido/glpi-kb-hint-plugin</homepage>
+    <homepage>https://github.com/joaopedrocastor/faq_sugestoes</homepage>
     <license>GPLv3+</license>
     <authors>
-        <author>Tomás Di Domenico (original GLPI 11)</author>
+        <author>João Pedro Castor Quirino</author>
+        <author>Baseado em glpi-kb-hint de Tomás Di Domenico</author>
     </authors>
     <versions>
         <version>
-            <num>1.0.0</num>
+            <num>1.1.0</num>
             <compatibility>~10.0</compatibility>
         </version>
     </versions>

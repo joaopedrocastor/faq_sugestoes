@@ -1,25 +1,30 @@
 <?php
 
 /**
- * Configuration screen for the KB Hint plugin (GLPI 10).
- * Reachable via Setup > Plugins > (gear icon on "Sugestões da Base de Conhecimento").
+ * Configuration screen for the "Sugestões da Base de Conhecimento" plugin (GLPI 10).
+ * Reachable via Setup > Plugins > (gear icon on the plugin row).
  */
 
 include('../../../inc/includes.php');
 
 // Reuse the defaults + config-context helpers defined in hook.php.
-if (!function_exists('plugin_kbhint_getDefaultConfig')) {
+if (!function_exists('plugin_faq_sugestoes_getDefaultConfig')) {
     include_once(__DIR__ . '/../hook.php');
 }
 
 // Only users allowed to change global configuration may touch these settings.
 Session::checkRight('config', UPDATE);
 
-$defaults = plugin_kbhint_getDefaultConfig();
+$defaults = plugin_faq_sugestoes_getDefaultConfig();
 
 // Save.
 if (isset($_POST['update'])) {
     Session::checkCSRF($_POST);
+
+    $display = ($_POST['display_mode'] ?? '');
+    if (!in_array($display, ['inline', 'floating', 'both'], true)) {
+        $display = $defaults['display_mode'];
+    }
 
     $values = [
         'enabled'       => isset($_POST['enabled']) && (int) $_POST['enabled'] === 1 ? 1 : 0,
@@ -27,19 +32,20 @@ if (isset($_POST['update'])) {
         'min_query_len' => max(2, min(5, (int) ($_POST['min_query_len'] ?? $defaults['min_query_len']))),
         'debounce_ms'   => max(100, min(2000, (int) ($_POST['debounce_ms'] ?? $defaults['debounce_ms']))),
         'match_mode'    => (($_POST['match_mode'] ?? '') === 'precision') ? 'precision' : 'recall',
+        'display_mode'  => $display,
         'panel_title'   => trim((string) ($_POST['panel_title'] ?? $defaults['panel_title'])),
     ];
     if ($values['panel_title'] === '') {
         $values['panel_title'] = $defaults['panel_title'];
     }
 
-    Config::setConfigurationValues(PLUGIN_KBHINT_CONFIG_CONTEXT, $values);
+    Config::setConfigurationValues(PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT, $values);
     Session::addMessageAfterRedirect(__('Configuração salva com sucesso.'), false, INFO);
     Html::back();
 }
 
 // Effective config = stored values merged over defaults.
-$conf = array_merge($defaults, Config::getConfigurationValues(PLUGIN_KBHINT_CONFIG_CONTEXT));
+$conf = array_merge($defaults, Config::getConfigurationValues(PLUGIN_FAQ_SUGESTOES_CONFIG_CONTEXT));
 
 Html::header(
     'Sugestões da Base de Conhecimento',
@@ -57,6 +63,15 @@ echo "<tr><th colspan='2'>Sugestões da Base de Conhecimento — Configuração<
 echo "<tr class='tab_bg_1'>";
 echo "<td width='45%'>Ativo</td><td>";
 Dropdown::showYesNo('enabled', (int) $conf['enabled']);
+echo "</td></tr>";
+
+echo "<tr class='tab_bg_1'>";
+echo "<td>Modo de exibição</td><td>";
+Dropdown::showFromArray('display_mode', [
+    'inline'   => 'Lista fixa abaixo do campo',
+    'floating' => 'Caixa flutuante',
+    'both'     => 'Ambas',
+], ['value' => $conf['display_mode']]);
 echo "</td></tr>";
 
 echo "<tr class='tab_bg_1'>";
@@ -101,7 +116,7 @@ Dropdown::showFromArray('match_mode', [
 echo "</td></tr>";
 
 echo "<tr class='tab_bg_1'>";
-echo "<td>Texto do cabeçalho da caixa de sugestões</td><td>";
+echo "<td>Texto do cabeçalho da lista de sugestões</td><td>";
 echo Html::input('panel_title', [
     'value' => $conf['panel_title'],
     'size'  => 50,
