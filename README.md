@@ -58,14 +58,22 @@ As sugestões dependem do índice **FULLTEXT** do MySQL/MariaDB sobre
 - artigos marcados como **FAQ** aparecem também para quem não tem permissão de
   leitura na base completa.
 
-## Personalização rápida (em `js/kbhint.js`)
+## Tela de configuração
 
-- `PANEL_TITLE` — texto do cabeçalho do dropdown.
-- `MIN_QUERY_LEN` — mínimo de caracteres por termo (padrão 3).
-- `DEBOUNCE_MS` — atraso após a digitação (padrão 300 ms).
-- `MAX_RESULTS` — número de sugestões (padrão 5).
-- `MATCH_MODE` — `'recall'` (mais abrangente) ou `'precision'` (título obrigatório).
-- `STOPWORDS` — palavras curtas ignoradas (já inclui PT/EN/ES).
+Em **Configurar → Plugins**, clique no ícone de engrenagem do plugin
+"Sugestões da Base de Conhecimento" (requer permissão de *Configuração → Atualizar*).
+As opções são salvas no banco (`glpi_configs`, contexto `plugin:kbhint`) e
+aplicadas ao JS automaticamente via `ajax/config.php`:
+
+- **Ativo** — liga/desliga as sugestões sem desativar o plugin.
+- **Número máximo de sugestões** (1–10, padrão 5).
+- **Mínimo de caracteres por termo** (2–5, padrão 3).
+- **Atraso após digitar** em ms (100–2000, padrão 300).
+- **Modo de correspondência** — Abrangente (recall) ou Preciso (título obrigatório).
+- **Texto do cabeçalho** da caixa de sugestões.
+
+A lista de `STOPWORDS` (palavras curtas ignoradas, já com PT/EN/ES) continua em
+`js/kbhint.js`, por ser mais técnica.
 
 ## Observações de deploy
 

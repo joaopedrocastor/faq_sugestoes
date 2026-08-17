@@ -14,15 +14,20 @@
     'use strict';
 
     const DEBUG_PREFIX = '[kbhint]';
-    const MIN_QUERY_LEN = 3;
-    const DEBOUNCE_MS = 300;
-    const MAX_RESULTS = 5;
     const MAX_TOKENS = 8;
-    // Header shown above the suggestion list.
-    const PANEL_TITLE = 'Artigos relacionados na Base de Conhecimento';
-    // 'recall'    = OR across title + description tokens (wider net, all ranked together).
-    // 'precision' = title tokens required, description tokens only boost score.
-    const MATCH_MODE = 'recall';
+    // Runtime settings, loaded from ajax/config.php (the plugin config screen).
+    // These defaults are used until that request resolves, and as a fallback if
+    // it fails. Keep them in sync with plugin_kbhint_getDefaultConfig() in hook.php.
+    // matchMode: 'recall'    = OR across title + description tokens (wider net).
+    //            'precision' = title tokens required, description only boosts score.
+    const CFG = {
+        enabled: true,
+        minQueryLen: 3,
+        debounceMs: 300,
+        maxResults: 5,
+        matchMode: 'recall',
+        panelTitle: 'Artigos relacionados na Base de Conhecimento',
+    };
     // Common short words that, once turned into prefix-wildcard tokens (for*, the*, para*),
     // would match too broadly: MySQL FT does not apply its stopword filter to wildcard
     // prefixes. Mirrors InnoDB's built-in English stopword list plus common Portuguese and
@@ -49,10 +54,48 @@
 
     const root = readRootDoc();
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
-    } else {
-        bootstrap();
+    // Load settings first, then wire up the form (unless disabled in config).
+    loadConfig().then(() => {
+        if (!CFG.enabled) {
+            return;
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+        } else {
+            bootstrap();
+        }
+    });
+
+    function loadConfig() {
+        const url = root + '/plugins/kbhint/ajax/config.php';
+        return fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        }).then((res) => (res.ok ? res.json() : null)).then((cfg) => {
+            if (!cfg || typeof cfg !== 'object') {
+                return;
+            }
+            if (typeof cfg.enabled === 'boolean') {
+                CFG.enabled = cfg.enabled;
+            }
+            if (cfg.min_query_len) {
+                CFG.minQueryLen = cfg.min_query_len;
+            }
+            if (cfg.debounce_ms) {
+                CFG.debounceMs = cfg.debounce_ms;
+            }
+            if (cfg.max_results) {
+                CFG.maxResults = cfg.max_results;
+            }
+            if (cfg.match_mode) {
+                CFG.matchMode = cfg.match_mode;
+            }
+            if (typeof cfg.panel_title === 'string' && cfg.panel_title) {
+                CFG.panelTitle = cfg.panel_title;
+            }
+        }).catch(() => {
+            // Network/endpoint error: keep the built-in defaults above.
+        });
     }
 
     function bootstrap() {
@@ -207,7 +250,7 @@
     function onTyping(state, anchor) {
         state.anchorEl = anchor;
         clearTimeout(state.debounceHandle);
-        state.debounceHandle = setTimeout(() => runQuery(state), DEBOUNCE_MS);
+        state.debounceHandle = setTimeout(() => runQuery(state), CFG.debounceMs);
     }
 
     function runQuery(state) {
@@ -245,7 +288,7 @@
         const tokens = [];
         const matches = text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
         for (const tok of matches) {
-            if (tok.length < MIN_QUERY_LEN) {
+            if (tok.length < CFG.minQueryLen) {
                 continue;
             }
             if (STOPWORDS.has(tok)) {
@@ -264,7 +307,7 @@
     }
 
     function buildBooleanExpression(titleTokens, descTokens) {
-        if (MATCH_MODE === 'recall') {
+        if (CFG.matchMode === 'recall') {
             const all = titleTokens.concat(descTokens);
             if (all.length === 0) {
                 return '';
@@ -333,7 +376,7 @@
 
         const headerTitle = document.createElement('span');
         headerTitle.className = 'kbhint-header-title';
-        headerTitle.textContent = PANEL_TITLE;
+        headerTitle.textContent = CFG.panelTitle;
         header.appendChild(headerTitle);
 
         const closeBtn = document.createElement('button');
@@ -367,7 +410,7 @@
     function render(state, results) {
         const list = state.dropdown.list;
         list.textContent = '';
-        state.items = results.slice(0, MAX_RESULTS);
+        state.items = results.slice(0, CFG.maxResults);
         state.selectedIndex = -1;
 
         if (state.items.length === 0) {

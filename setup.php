@@ -18,6 +18,11 @@ function plugin_init_kbhint(): void
     // kbhint.js bails out silently on anything that is not a ticket-creation form.
     $PLUGIN_HOOKS['add_javascript']['kbhint'] = 'js/kbhint.js';
     $PLUGIN_HOOKS['add_css']['kbhint']        = 'css/kbhint.css';
+
+    // Adds the "gear" config link on the plugins list (Setup > Plugins).
+    if (Session::haveRight('config', UPDATE)) {
+        $PLUGIN_HOOKS['config_page']['kbhint'] = 'front/config.form.php';
+    }
 }
 
 /**
@@ -28,7 +33,7 @@ function plugin_version_kbhint(): array
     return [
         'name'         => 'Sugestões da Base de Conhecimento',
         'version'      => PLUGIN_KBHINT_VERSION,
-        'author'       => 'Adaptado de Tomás Di Domenico (glpi-kb-hint-plugin)',
+        'author'       => 'João Pedro Castor Quirino',
         'license'      => 'GPLv3+',
         'homepage'     => 'https://github.com/tdido/glpi-kb-hint-plugin',
         'requirements' => [
