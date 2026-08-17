@@ -1,8 +1,14 @@
 <?php
 
-define('PLUGIN_FAQ_SUGESTOES_VERSION', '1.1.0');
+define('PLUGIN_FAQ_SUGESTOES_VERSION', '1.1.1');
 define('PLUGIN_FAQ_SUGESTOES_MIN_GLPI', '10.0.0');
 define('PLUGIN_FAQ_SUGESTOES_MAX_GLPI', '10.0.99');
+
+// Load the menu class explicitly. GLPI's legacy autoloader cannot resolve
+// Plugin<Name><Class> when the plugin directory name contains an underscore
+// (faq_sugestoes), which previously caused a fatal "Class ... not found" while
+// building the central menu. Requiring it here guarantees it is always defined.
+require_once __DIR__ . '/inc/menu.class.php';
 
 /**
  * Init the plugin: register the hooks that inject the CSS/JS on GLPI pages.
