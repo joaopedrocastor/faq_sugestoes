@@ -17,10 +17,10 @@ Session::checkRight('config', UPDATE);
 
 $defaults = plugin_faq_sugestoes_getDefaultConfig();
 
-// Save.
+// Save. (CSRF is validated automatically by GLPI core on POST — the form's
+// token comes from Html::closeForm() below; a manual checkCSRF here would
+// double-consume the token and fail with "action not allowed".)
 if (isset($_POST['update'])) {
-    Session::checkCSRF($_POST);
-
     $display = ($_POST['display_mode'] ?? '');
     if (!in_array($display, ['inline', 'floating', 'both'], true)) {
         $display = $defaults['display_mode'];
@@ -50,8 +50,8 @@ $conf = array_merge($defaults, Config::getConfigurationValues(PLUGIN_FAQ_SUGESTO
 Html::header(
     'Sugestões da Base de Conhecimento',
     $_SERVER['PHP_SELF'],
-    'config',
-    'plugin'
+    'admin',
+    'PluginFaqSugestoesMenu'
 );
 
 echo "<form method='post' action='" . htmlspecialchars($_SERVER['PHP_SELF']) . "'>";

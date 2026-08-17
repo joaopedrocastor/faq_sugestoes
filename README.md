@@ -53,9 +53,13 @@ foi reescrita para o **formulário clássico do GLPI 10**.
 
 ## Tela de configuração
 
-Em **Configurar → Plugins**, clique na engrenagem do plugin (requer permissão de
-*Configuração → Atualizar*). As opções são salvas no banco (`glpi_configs`,
-contexto `plugin:faq_sugestoes`) e aplicadas ao JS via `ajax/config.php`:
+Duas formas de abrir (ambas exigem permissão de *Configuração → Atualizar*):
+
+- **Administração → Sugestões da Base de Conhecimento** (item de menu próprio); ou
+- **Configurar → Plugins**, clicando na engrenagem do plugin.
+
+As opções são salvas no banco (`glpi_configs`, contexto `plugin:faq_sugestoes`)
+e aplicadas ao JS via `ajax/config.php`:
 
 - **Ativo** — liga/desliga as sugestões sem desativar o plugin.
 - **Modo de exibição** — Lista fixa / Caixa flutuante / Ambas.

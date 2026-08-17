@@ -23,6 +23,12 @@ function plugin_init_faq_sugestoes(): void
     if (Session::haveRight('config', UPDATE)) {
         $PLUGIN_HOOKS['config_page']['faq_sugestoes'] = 'front/config.form.php';
     }
+
+    // Adds a proper menu entry under "Administração" (like other plugins do).
+    // The class itself hides the entry from users without the config right.
+    $PLUGIN_HOOKS['menu_toadd']['faq_sugestoes'] = [
+        'admin' => 'PluginFaqSugestoesMenu',
+    ];
 }
 
 /**
