@@ -22,7 +22,7 @@ function plugin_faq_sugestoes_getDefaultConfig(): array
         'debounce_ms'   => 300,
         'match_mode'    => 'recall',
         'display_mode'  => 'inline',
-        'panel_title'   => 'Artigos sugeridos',
+        'panel_title'   => 'Encontramos artigos que podem resolver seu problema antes da abertura do chamado.',
     ];
 }
 
